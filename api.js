@@ -1,6 +1,6 @@
-const e = require('cors');
 const {createAccessToken, isTokenExpired, createRefreshToken} = require('./createJWT');
 const {hashPassword} = require ('./passwordHashing');
+const {createCode} = require ('./createVerificationCode');
 const bcrypt = require ('bcrypt');
 
 let app; 
@@ -10,7 +10,10 @@ function setApp(application, dbClient){
     app = application;
     client = dbClient;
 
-    //APIs
+    //Login API
+
+    //Incoming: Email, Password
+    //Outgoing: JSON Token: UserID, isConnected
 
     app.post('/api/login', async (req, res) => {
         try{
@@ -27,15 +30,16 @@ function setApp(application, dbClient){
             //Retrieve Result through Email
             const result = await db.collection('Users').find({Email: email}).toArray();
 
+
             if(result.length == 0)
                 return res.status(401).json({error: "Email or Password is Incorrect!"});
 
 
             //Verify Correct Password
             const storedPassword = result[0].Password; //Hashed Password stored in DB
-            const passwordsMatch =  await bcrypt.compare(password, storedPassword); //Check if HashedPassword === Input Password
+            //const passwordsMatch =  await bcrypt.compare(password, storedPassword); //Check if HashedPassword === Input Password
 
-            if(!passwordsMatch)
+            if(storedPassword !== password)
                 return res.status(401).json({error: "Email or Password is Incorrect!"});
 
             //Initialize Outgoing information
@@ -55,6 +59,58 @@ function setApp(application, dbClient){
            return res.status(500).json({error: "An unexpected error ocurred."});
         }
     });
+
+    //VerificationCode API
+
+    //Incoming: Email
+    //Outgoing: Verification Code
+
+    app.post('/api/verification', async (req, res) => {
+        try{
+            const {email} = req.body;
+
+            //Check if field empty
+            if(!email)
+                return res.status(400).json({error: "All fields must be filled!"});
+
+            //Check if Account with Email already exist
+
+            const db = client.db('PEISS_DB'); //Connect to Database
+
+            let result = await db.collection('Users').find({Email: email}).toArray();
+
+            if(result.length !== 0)
+                return res.status(401).json({error: "Account with this email already exists."});
+
+            //Send Verification
+            let verificationCode = createCode();
+
+            const sgMail = require('@sendgrid/mail');
+            sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+            const msg = {
+                to: email,
+                from: {
+                    email: 'peiss2025@protonmail.com',
+                    name: 'PEISS Verification'
+                },
+                subject: "PEISS Verification Code",
+                text: `Your verification code is: ${verificationCode}`,
+                html: `<p>Enter this verification code to the app: <strong>${verificationCode}</strong></p>`
+            };
+
+            await sgMail.send(msg);
+            
+            return res.status(200).json({verificationCode});
+        }
+        catch(error){
+            return res.status(500).json({error: "An unexpected error ocurred."});
+        }
+    });
+    
+    
+
+
 
     app.post('/api/refresh_token', async (req, res) => {
         const { refreshToken } = req.body;
