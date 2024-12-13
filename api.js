@@ -107,6 +107,49 @@ function setApp(application, dbClient){
             return res.status(500).json({error: "An unexpected error ocurred."});
         }
     });
+
+
+    //Register API
+
+    //Incoming: Email Password
+
+    //Outgoing: JSON Token 
+
+    app.post('/api/register', async (req, res) => {
+        try{
+            const {email, password} = req.body;
+            let isConnected = false;
+
+            //Check if both fields filled
+            if(!email || !password)
+                return res.status(400).json({error: "All fields must be filled!"});
+
+    
+            hashedPassword = await hashPassword(password); //Hash Password
+        
+            db = dbClient.db('PEISS_DB'); //Connect to database
+
+            let newUser = { 
+                Email: email,
+                Password: hashedPassword,
+                isConnected: isConnected
+            };
+
+            //Insert to Database
+            let ret = await db.collection('Users').insertOne(newUser);
+
+            let userInfo = {
+                userID: ret.insertedId,
+                isConnected: false
+            };
+
+            let accessToken = createAccessToken(userInfo);
+            return res.status(200).json({accessToken});
+        }
+        catch(error){
+            return res.status(500).json({error: "An unexpected error ocurred."});
+        }
+    });
     
     
 
