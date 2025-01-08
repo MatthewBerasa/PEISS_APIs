@@ -2,6 +2,8 @@ const {createAccessToken, isTokenExpired, createRefreshToken} = require('./creat
 const {hashPassword} = require ('./passwordHashing');
 const {createCode} = require ('./createVerificationCode');
 const bcrypt = require ('bcrypt');
+const req = require('express/lib/request');
+const { ObjectId } = require('mongodb');
 
 let app; 
 let client;
@@ -127,7 +129,7 @@ function setApp(application, dbClient){
     
             hashedPassword = await hashPassword(password); //Hash Password
         
-            db = dbClient.db('PEISS_DB'); //Connect to database
+            const db = dbClient.db('PEISS_DB'); //Connect to database
 
             let newUser = { 
                 Email: email,
@@ -151,8 +153,34 @@ function setApp(application, dbClient){
         }
     });
     
-    
+    app.get('/api/provideSettings', async (req, res) => {
+        try{
+            const {deviceID} = req.query;
+            if(!deviceID)
+                return res.status(400).json({error: "Device ID not specified"});
 
+            //Convert to ObjectID
+            const objectDeviceID = new ObjectId(deviceID);
+            console.log(objectDeviceID);
+
+            const db = dbClient.db('PEISS_DB'); //Connect to Database
+
+            let system = await db.collection('System').find({_id: objectDeviceID}).toArray(); //Retrieve Data of System
+
+            if(system.length == 0)
+                return res.status(401).json({error: "System does not exist!"});
+
+            let result = {
+                alarmSetting: system[0].Alarm,
+                notificationSetting: system[0].Notifications
+            };
+
+            return res.status(200).json(result);    
+        }
+        catch(error){
+            return res.status(500).json({error: "An unexpected error ocurred."});
+        }
+    });
 
 
     app.post('/api/refresh_token', async (req, res) => {
