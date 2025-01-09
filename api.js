@@ -182,6 +182,42 @@ function setApp(application, dbClient){
         }
     });
 
+    app.post('/api/updateSettings', async (req, res) => {
+        try{
+            const {alarmSetting, notificationSetting, deviceID} = req.body;
+
+            if(alarmSetting === null || notificationSetting === null)
+                return res.status(400).json({error: "Settings not specified!"});
+
+            if(!deviceID)
+                return res.status(400).json({error: "Device ID not specified."});
+            
+            let objectDeviceID = new ObjectId(deviceID);
+
+            //Connect to Database 
+            const db = dbClient.db('PEISS_DB');
+            let system = db.collection('System').find({_id: objectDeviceID}).toArray();
+
+            if(system.length == 0)
+                return res.status(401).json({error: "System does not exist!"});
+
+            let updateSettings = {
+                Alarm: alarmSetting,
+                Notifications: notificationSetting
+            };
+
+            await db.collection('System').updateOne(
+                {_id: objectDeviceID}, 
+                {$set: updateSettings}
+            );
+
+            return res.status(200).json({message: "Settings Updated Successfully!"});
+        }
+        catch(error){
+            return res.status(500).json({error: "An unexpected error occurred."});
+        }
+    });
+
 
     app.post('/api/refresh_token', async (req, res) => {
         const { refreshToken } = req.body;
