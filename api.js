@@ -5,6 +5,47 @@ const bcrypt = require ('bcrypt');
 const req = require('express/lib/request');
 const { ObjectId } = require('mongodb');
 
+const multer = require('multer');
+const multerS3 = require('multer-s3');
+const path = require('path');
+const { S3Client } = require('@aws-sdk/client-s3'); // Import the S3Client
+
+// Configure DigitalOcean Spaces with AWS SDK v3
+const s3Client = new S3Client({
+    forcePathStyle: false,
+    region: 'nyc3',
+    endpoint: 'https://nyc3.digitaloceanspaces.com',
+    credentials: {
+        accessKeyId: process.env.DO_SPACES_ACCESS_KEY,
+        secretAccessKey: process.env.DO_SPACES_SECRET_KEY
+    }
+  });
+
+// Configure Multer to Upload Directly to Spaces
+const upload = multer({
+  storage: multerS3({
+    s3: s3Client,
+    bucket: process.env.DO_SPACES_BUCKET,
+    acl: 'public-read', // Adjust permissions as necessary
+    key: (req, file, cb) => {
+      const fileName = `${Date.now()}-${file.originalname}`;
+      cb(null, fileName);
+    },
+  }),
+  fileFilter: (req, file, cb) => {
+    const fileTypes = /jpeg|jpg|png/;
+    const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimeType = fileTypes.test(file.mimetype);
+
+    if (extname && mimeType) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only .jpeg, .jpg, and .png files are allowed.'));
+    }
+  },
+});
+
+
 let app; 
 let client;
 
@@ -161,7 +202,6 @@ function setApp(application, dbClient){
 
             //Convert to ObjectID
             const objectDeviceID = new ObjectId(deviceID);
-            console.log(objectDeviceID);
 
             const db = dbClient.db('PEISS_DB'); //Connect to Database
 
@@ -218,7 +258,74 @@ function setApp(application, dbClient){
         }
     });
 
+    app.get('/api/getLogs', async (req, res) => {
+        try{
+            const {deviceID} = req.query;
 
+            if(!deviceID)
+                return res.status(400).json({error: "System not specified."});
+
+            let objectDeviceID = new ObjectId(deviceID); //Convert to Object ID
+
+            //Conect to Database
+            let db = dbClient.db('PEISS_DB');
+
+            //Reterieve all data entries with System ID from Request Body
+            let logs = await db.collection('ActivityLogs').find({SystemID: objectDeviceID}).toArray();
+
+            if(logs.length === 0)
+                return res.status(404).json({error: "No activity logs found."});
+
+            return res.status(200).json({logs});
+        }catch(error){
+            return res.status(500).json({error: "An error has occured."});
+        }
+    });
+
+    
+    app.post('/api/addActivityLog', upload.single('image'), async (req, res) => {
+        try {
+            const { deviceID } = req.body;
+
+            if (!deviceID) 
+                return res.status(400).json({error: 'deviceID must be specified.'});
+        
+            // Convert deviceID to ObjectId
+            const objectDeviceID = new ObjectId(deviceID);
+    
+            // Image upload URL
+            let imageUrl = null;
+            if (req.file) 
+                imageUrl = req.file.location; // DigitalOcean Spaces file URL
+            
+            // Create the timestamp on the server-side (current time)
+            const timestamp = new Date();
+    
+            // Connect to database
+            const db = client.db('PEISS_DB');
+    
+            // Check if system exists
+            const systemExists = await db.collection('System').findOne({ _id: objectDeviceID });
+            if (!systemExists) 
+                return res.status(404).json({ error: 'System does not exist.' });
+            
+            // Create activity log entry
+            const newLog = {
+                SystemID: objectDeviceID,
+                Timestamp: timestamp,
+                ImageURL: imageUrl // Use Spaces file URL
+            };
+    
+            // Insert activity log into the database
+            await db.collection('ActivityLogs').insertOne(newLog);
+    
+            return res.status(200).json({message: 'Activity log added successfully!'});
+    
+        } catch (error) {    
+            return res.status(500).json({error: 'An unexpected error occurred.'});
+        }
+    });
+    
     app.post('/api/refresh_token', async (req, res) => {
         const { refreshToken } = req.body;
         if (!refreshToken) return res.status(401).send("Refresh token required");
