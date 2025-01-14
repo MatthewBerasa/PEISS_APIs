@@ -9,6 +9,7 @@ const multer = require('multer');
 const multerS3 = require('multer-s3');
 const path = require('path');
 const { S3Client } = require('@aws-sdk/client-s3'); // Import the S3Client
+const { json } = require('stream/consumers');
 
 // Configure DigitalOcean Spaces with AWS SDK v3
 const s3Client = new S3Client({
@@ -323,6 +324,121 @@ function setApp(application, dbClient){
     
         } catch (error) {    
             return res.status(500).json({error: 'An unexpected error occurred.'});
+        }
+    });
+
+    app.get('/api/connectSystem', async (req, res) => {
+        try{
+            const {deviceID, userID} = req.query;
+
+            if(!deviceID)
+                return res.status(400).json({error: "System not specified."});
+
+            if(!userID)
+                return res.status(400).json({error: "User not specified"});
+
+            let objectDeviceID = new ObjectId(deviceID);
+            let objectUserID = new ObjectId(userID);
+
+            //Connect to database
+            let db = dbClient.db('PEISS_DB');
+
+            let system = await db.collection('System').findOne({_id: objectDeviceID});
+
+            if(!system)
+                return res.status(404).json({error: "System not found."});
+
+            let user = await db.collection('Users').findOne({_id: objectUserID});
+
+            if(!user)
+                return res.status(404).json({error: "User not found."});
+
+            //Update and Connect
+            let update = {
+                isConnected: true
+            };
+
+            let res1 = await db.collection('Users').updateOne(
+                {_id: objectUserID},
+                {$set: update}
+            );
+            let res2 = await db.collection('System').updateOne(
+                {_id: objectDeviceID},
+                {$push: {Users: objectUserID}},
+            );
+            
+            if(res1.modifiedCount === 0 || res2.modifiedCount === 0)
+                return res.status(400).json({message: "Update Unsuccesfull"});
+
+            return res.status(200).json({message: "System connected."});
+        }catch(error){
+            return res.status(500).json({error: "An error has occurred"});
+        }   
+    });
+
+    app.get('/api/getAlarmState', async (req, res) => {
+        try{
+            const {deviceID} = req.query;
+
+            if(!deviceID)
+                return res.status(400).json({error: "System not specified."});
+
+            let objectDeviceID = new ObjectId(deviceID);
+
+            //Connect to database
+            let db = dbClient.db('PEISS_DB');
+            let system = await db.collection('System').findOne({_id: objectDeviceID});
+            
+            if(!system)
+                return res.status(404).json({error: "System not found."});
+
+            let alarmState = {
+                alarmSounding: system.alarmSounding,
+                alarmEnabled: system.Alarm
+            };
+
+            return res.status(200).json({alarmState});
+        }catch(error){
+            return res.status(500).json({error: "An error has occurred."});
+        }
+
+    });
+
+    app.post('/api/updateAlarmState', async (req, res) => {
+        try{
+            const{deviceID, alarmState} = req.body;
+
+            if(!deviceID)
+                return res.status(400).json({error: "System not specified."});
+
+            if(typeof alarmState !== 'boolean')
+                return res.status(400).json({error: "Invalid alarmState, must be boolean."});
+
+            let objectDeviceID = new ObjectId(deviceID);
+
+            //Connect to database
+            let db = dbClient.db('PEISS_DB');
+            let system = await db.collection('System').findOne({_id: objectDeviceID});
+
+            if(!system)
+                return res.status(404).json({error: "System not found."});
+
+            //Update
+            let update = {
+                alarmSounding: alarmState
+            };
+
+            let result = await db.collection('System').updateOne(
+                {_id: objectDeviceID},
+                {$set: update}
+            );
+
+            if(result.modifiedCount === 0)
+                return res.statu(400).json({error: 'Update Unsuccessful.'});
+
+            return res.status(200).json({message: "Update Successful"});
+        }catch(error){
+            return res.status(500).json({error: "An error has occurred."});
         }
     });
     
