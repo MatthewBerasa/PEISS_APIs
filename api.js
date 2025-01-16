@@ -81,9 +81,9 @@ function setApp(application, dbClient){
 
             //Verify Correct Password
             const storedPassword = result[0].Password; //Hashed Password stored in DB
-            //const passwordsMatch =  await bcrypt.compare(password, storedPassword); //Check if HashedPassword === Input Password
+            const passwordsMatch =  await bcrypt.compare(password, storedPassword); //Check if HashedPassword === Input Password
 
-            if(storedPassword !== password)
+            if(!passwordsMatch)
                 return res.status(401).json({error: "Email or Password is Incorrect!"});
 
             //Initialize Outgoing information
