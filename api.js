@@ -441,6 +441,88 @@ function setApp(application, dbClient){
             return res.status(500).json({error: "An error has occurred."});
         }
     });
+
+    app.get('/api/disconnectSystem', async (req, res) => {
+        try{
+            const{deviceID, userID} = req.query;
+
+            if(!deviceID)
+                return res.status(400).json({error: "System not specified."});
+
+            if(!userID)
+                return res.status(400).json({error: "User not specified."});
+
+            //Create ObjectIds
+            let objectDeviceID = new ObjectId(deviceID);
+            let objectUserID = new ObjectId(userID);
+
+            //Connect to database
+            let db = dbClient.db('PEISS_DB');
+
+            let system = await db.collection('System').findOne({_id: objectDeviceID});
+            if(!system)
+                return res.status(404).json({error: "System not found."});
+
+            let user = await db.collection('System').findOne({
+                _id: objectDeviceID,
+                Users: objectUserID
+            });
+
+            if(!user)
+                return res.status(404).json({error: "User not connected to system."});
+
+            //Update and Disconnect
+            let update = {
+                isConnected: false
+            };
+
+            //Remove User Connectop
+            let result = await db.collection('System').updateOne(
+                {_id: objectDeviceID},
+                {$pull: {Users: objectUserID}}
+            );
+
+            //Change User Connection Status
+            let result2 = await db.collection('Users').updateOne(
+                {_id: objectUserID},
+                {$set: update}
+            );
+
+            if(result.modifiedCount === 0 || result2.modifiedCount === 0)
+                return res.status(400).json({error: "User Disconnection Unsuccessful."});
+            
+            return res.status(400).json({message: "User Disconnection Successful."});
+        }catch(error){
+            return res.status(500).json({error: "An error has occurred."});
+        }     
+    });
+
+    app.post('/api/checkConnection', async (req, res) => {
+        try{
+            const{userID} = req.body;
+
+            if(!userID)
+                return res.status(400).json({error: "User not specified."});
+
+            //Create ObjectIds
+            let objectUserID = new ObjectId(userID);
+
+            //Connect to database
+            let db = dbClient.db('PEISS_DB');
+
+            let user = await db.collection('Users').findOne({_id: objectUserID});
+            if(!user)
+                return res.status(404).json({error: "User not found."});
+
+            let status = {
+                connectionStatus: user.isConnected
+            };
+
+            return res.status(200).json(status);            
+        }catch(error){
+            return res.status(500).json({error: "An error has occurred."});
+        }   
+    });
     
     app.post('/api/refresh_token', async (req, res) => {
         const { refreshToken } = req.body;
