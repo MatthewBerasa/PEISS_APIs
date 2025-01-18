@@ -491,7 +491,7 @@ function setApp(application, dbClient){
             if(result.modifiedCount === 0 || result2.modifiedCount === 0)
                 return res.status(400).json({error: "User Disconnection Unsuccessful."});
             
-            return res.status(400).json({message: "User Disconnection Successful."});
+            return res.status(200).json({message: "User Disconnection Successful."});
         }catch(error){
             return res.status(500).json({error: "An error has occurred."});
         }     
