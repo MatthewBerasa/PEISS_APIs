@@ -434,7 +434,7 @@ function setApp(application, dbClient){
             );
 
             if(result.modifiedCount === 0)
-                return res.statu(400).json({error: 'Update Unsuccessful.'});
+                return res.status(400).json({error: 'Update Unsuccessful.'});
 
             return res.status(200).json({message: "Update Successful"});
         }catch(error){
