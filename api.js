@@ -1,4 +1,4 @@
-const {createAccessToken, isTokenExpired, createRefreshToken} = require('./createJWT');
+const { createAccessToken, isTokenExpired, refreshToken } = require('./createJWT');
 const {hashPassword} = require ('./passwordHashing');
 const {createCode} = require ('./createVerificationCode');
 const bcrypt = require ('bcrypt');
@@ -524,17 +524,27 @@ function setApp(application, dbClient){
         }   
     });
     
+    //Refresh the Token 
     app.post('/api/refresh_token', async (req, res) => {
-        const { refreshToken } = req.body;
-        if (!refreshToken) return res.status(401).send("Refresh token required");
-    
-        // Verify refresh token and generate new access token
         try {
-            const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-            const newAccessToken = createAccessToken(decoded.userInfo);
-            res.json({ accessToken: newAccessToken });
-        } catch (err) {
-            return res.status(403).send("Invalid or expired refresh token");
+            const { token } = req.body;
+
+            if (!token) {
+                return res.status(400).json({ error: "Token is required." });
+            }
+
+            if (isTokenExpired(token)) {
+                return res.status(200).json({ message: "Token is still valid." });
+            } else {
+                const newAccessToken = refreshToken(token);
+                if (newAccessToken) {
+                    return res.status(200).json({ accessToken: newAccessToken });
+                } else {
+                    return res.status(400).json({ error: "Unable to refresh token." });
+                }
+            }
+        } catch (error) {
+            return res.status(500).json({ error: "An unexpected error occurred." });
         }
     });
 

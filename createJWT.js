@@ -3,7 +3,7 @@ require("dotenv").config();
 
 function createAccessToken(userInfo) 
 {
-    return jwt.sign({ userInfo: userInfo }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+    return jwt.sign({ userInfo: userInfo }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '365d' });
 }
 
 // This function will be called within various APIs (probably CRUD events)
@@ -27,10 +27,20 @@ function isTokenExpired(token)
     }
 }
 
-//Refresh the Token 
-function createRefreshToken(userInfo) {
-    return jwt.sign({ userInfo: userInfo }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '365d' });  // 1 year expiration
+function refreshToken(token)
+{
+    try 
+    {
+        // Decode current token to get userInfo
+        const decoded = jwt.decode(token);
+        // Creates new token with existing userInfo
+        return createAccessToken(decoded.userInfo);
+    } 
+    catch (error) 
+    {
+        return null;
+    } 
 }
 
 
-module.exports = {createAccessToken, isTokenExpired, createRefreshToken};
+module.exports = {createAccessToken, isTokenExpired, refreshToken};
