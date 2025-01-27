@@ -533,15 +533,11 @@ function setApp(application, dbClient){
                 return res.status(400).json({ error: "Token is required." });
             }
 
-            if (isTokenExpired(token)) {
-                return res.status(200).json({ message: "Token is still valid." });
+            const newAccessToken = refreshToken(token);
+            if (newAccessToken) {
+                return res.status(200).json({ accessToken: newAccessToken });
             } else {
-                const newAccessToken = refreshToken(token);
-                if (newAccessToken) {
-                    return res.status(200).json({ accessToken: newAccessToken });
-                } else {
-                    return res.status(400).json({ error: "Unable to refresh token." });
-                }
+                return res.status(400).json({ error: "Unable to refresh token." });
             }
         } catch (error) {
             return res.status(500).json({ error: "An unexpected error occurred." });
