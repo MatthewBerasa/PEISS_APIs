@@ -523,6 +523,35 @@ function setApp(application, dbClient){
             return res.status(500).json({error: "An error has occurred."});
         }   
     });
+
+    app.get('/api/specificLog', async (req, res) => {
+
+        try{
+            const {logID} = req.query;
+
+            if(!logID){
+                return res.status(400).json({error: "Log ID not specified."});
+            }
+
+            //Convert to Object
+            let objectLogID = new ObjectId(logID);
+
+
+            //connect to database
+            let db = dbClient.db('PEISS_DB');
+            let result = await db.collection('ActivityLogs').findOne({_id: objectLogID});
+
+
+            if(!result)
+                return res.status(404).json({error: "Log not found."});
+
+            return res.status(200).json(result);
+        }catch(error){
+            return res.status(500).json({error: "An error has occured."});
+        }
+
+
+    });
     
     //Refresh the Token 
     app.post('/api/refresh_token', async (req, res) => {
