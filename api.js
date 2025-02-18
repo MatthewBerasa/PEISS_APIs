@@ -547,19 +547,114 @@ function setApp(application, dbClient){
 
             return res.status(200).json(result);
         }catch(error){
-            return res.status(500).json({error: "An error has occured."});
+            return res.status(500).json({error: "An error has occurred."});
         }
 
 
     });
 
     //Pass DeviceID 
-    app.get('/api/getDeviceID', (req, res) => {
+    app.get('/api/getDeviceID', async (req, res) => {
         const deviceID = "674f1c233c69e373be41e8cf";
 
         return res.status(200).json({deviceID: deviceID});
     });
+
+    //Update System WiFi Connection
+    app.post('/api/updateSystemWiFiConnection', async (req, res) => {
+        try{
+            const {deviceID, wifiState} = req.body;
+
+            if(!deviceID)
+                return res.status(400).json({error: "Device ID not specified."});
+
+            if(typeof wifiState != 'boolean')
+                return res.status(400).json({error: "Invalid wifiState, must be boolean."});
+
+            //Convert to ObjectID
+            let objectDeviceID = new ObjectId(deviceID);
+
+            //Connect to Database
+            let db = dbClient.db('PEISS_DB');
+            let system = await db.collection('System').findOne({_id: objectDeviceID});
+
+            if(!system)
+                return res.status(404).json({error: "System not found."});
+
+            let result = await db.collection('System').updateOne(
+                {_id: objectDeviceID},
+                {$set: {wifiConnection: wifiState}}
+            );
+
+            if(result.modifiedCount == 0){
+                return res.status(400).json({error: "WiFi Connection Update Unsuccessful."});
+            }
+            
+            return res.status(200).json({message: "WiFi Conneciton Update Successfull."});            
+        }catch(error){
+            return res.status(500).json({error: "An error has occurred."});
+        }
+    });
     
+    //Check ESP32 WiFi Connection
+    app.get('/api/checkSystemWiFiConnection', async (req, res) => {
+        try{
+        const{deviceID} = req.query;
+
+        if(!deviceID)
+            return res.status(400).json({error: "Device ID not specified."});
+
+        //Conver to ObjectID
+        let objectDeviceID = new ObjectId(deviceID);
+
+        //Connect to database
+        let db = dbClient.db("PEISS_DB");
+        let system = await db.collection('System').findOne({_id: objectDeviceID});
+            
+        if(!system)
+            return res.status(404).json({error: "System not found."});
+
+        let status = {
+            wifiConnection: system.wifiConnection
+        }
+
+        return res.status(200).json({status});
+
+        }catch(error){
+            return res.status(500).json({error: "An error has occurred."})
+        }
+    });
+
+    //Get number of users connected to system
+    app.get('/api/getSystemUsers', async (req, res) => {
+        try{
+            const{deviceID} = req.query;
+
+            if(!deviceID)
+                return res.status(400).json({error: "Device ID not specified."});
+
+            //Convert to ObjectID
+            let objectDeviceID = new ObjectId(deviceID);
+
+            //Connect to Databse
+            let db = dbClient.db("PEISS_DB");
+            let system = await db.collection('System').findOne({_id: objectDeviceID});
+
+            if(!system)
+                return res.status(404).json({error: "System not found."});
+
+            let result = {
+                usersConnected: system.Users
+            };
+
+            return res.status(200).json({result});
+        }catch(error){
+            return res.status(500).json({error: "An error has occurred."});
+        }
+
+    });
+
+
     //Refresh the Token 
     app.post('/api/refresh_token', async (req, res) => {
         try {
