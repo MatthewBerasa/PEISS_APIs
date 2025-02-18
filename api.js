@@ -552,6 +552,13 @@ function setApp(application, dbClient){
 
 
     });
+
+    //Pass DeviceID 
+    app.get('/api/getDeviceID', (req, res) => {
+        const deviceID = "674f1c233c69e373be41e8cf";
+
+        return res.status(200).json({deviceID: deviceID});
+    });
     
     //Refresh the Token 
     app.post('/api/refresh_token', async (req, res) => {
