@@ -693,6 +693,7 @@ function setApp(application, dbClient){
     app.post('/api/updateFCMToken', async (req, res) => {
         try{
             const {userID, fcmToken} = req.body;
+            let updatedToken = "";
 
             //Check if userID empty
             if(!userID)
@@ -700,10 +701,13 @@ function setApp(application, dbClient){
 
             //Disassiocate User with Firebase Token
             if(!fcmToken)
-                fcmToken = "";
+                updatedToken = "";
+            else
+                updatedToken = fcmToken;
 
             //Convert ObjectID
             let userObjectId = new ObjectId(userID);
+            
 
             //Connect to Databse
             let db = dbClient.db("PEISS_DB");
@@ -715,13 +719,13 @@ function setApp(application, dbClient){
             //Update 
             let result = await db.collection('Users').updateOne(
                 {_id: userObjectId},
-                {$set: {fcmToken: fcmToken}}
+                {$set: {fcmToken: updatedToken}}
             );
 
             if(result.modifiedCount == 0)
                 return res.status("Firebase Token update unsuccessful!");
 
-            return res.status(200).json({error: "Firebase Token Update Successful!"});
+            return res.status(200).json({message: "Firebase Token Update Successful!"});
         }catch(error){
             return res.status(500).json({error: "An error has occurred."});
         }
