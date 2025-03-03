@@ -162,14 +162,17 @@ function setApp(application, dbClient){
 
     app.post('/api/register', async (req, res) => {
         try{
-            const {email, password} = req.body;
+            const {email, password, fcmToken} = req.body;
             let isConnected = false;
 
             //Check if both fields filled
             if(!email || !password)
                 return res.status(400).json({error: "All fields must be filled!"});
 
-    
+            //Check if fcmToken Recieved
+            if(!fcmToken)
+                return res.status(400).json({error: "Firebase Token not specified."});
+
             hashedPassword = await hashPassword(password); //Hash Password
         
             const db = dbClient.db('PEISS_DB'); //Connect to database
@@ -177,7 +180,8 @@ function setApp(application, dbClient){
             let newUser = { 
                 Email: email,
                 Password: hashedPassword,
-                isConnected: isConnected
+                isConnected: isConnected,
+                fcmToken: fcmToken,
             };
 
             //Insert to Database
@@ -287,7 +291,7 @@ function setApp(application, dbClient){
     
     app.post('/api/addActivityLog', upload.single('image'), async (req, res) => {
         try {
-            const { deviceID } = req.body;
+            const {deviceID} = req.body;
 
             if (!deviceID) 
                 return res.status(400).json({error: 'deviceID must be specified.'});
@@ -321,26 +325,36 @@ function setApp(application, dbClient){
             // Insert activity log into the database
             await db.collection('ActivityLogs').insertOne(newLog);
 
-            // Send FCM Notification
-            if (fcmToken) {
-                const message = {
-                    token: fcmToken, // User's FCM token
-                    notification: {
-                        title: 'New Activity Log',
-                        body: 'Dectecion Alert!',
-                    },
-                    data: {
-                        imageUrl: imageUrl || '',
-                        timestamp: timestamp.toISOString()
-                    }
-                };
+            //Send Notification to every user associated with system
+            let userList = systemExists.Users;
 
-                // Send the notification
-                admin.messaging().send(message)
-                    .then(response => console.log('Notification sent:', response))
-                    .catch(error => console.error('Error sending notification:', error));
+            for(let i = 0; i < userList.length; i++){
+                let user = await db.collection('Users').findOne({_id: userList[i]});
+                if(!user)
+                    return res.status(404).json({error: "User not found."});
+
+                let fcmToken = user.fcmToken;
+                // Send FCM Notification
+                if (fcmToken) {
+                    const message = {
+                        token: fcmToken, // User's FCM token
+                        notification: {
+                            title: 'New Activity Log',
+                            body: 'A new activity log has been uploaded!',
+                        },
+                        data: {
+                            imageUrl: imageUrl || '',
+                            timestamp: timestamp.toISOString()
+                        }
+                    };
+
+                    // Send the notification
+                    admin.messaging().send(message)
+                        .then(response => console.log('Notification sent:', response))
+                        .catch(error => console.error('Error sending notification:', error));
+                }
             }
-    
+
             return res.status(200).json({message: 'Activity log added successfully!'});
     
         } catch (error) {    
@@ -674,6 +688,44 @@ function setApp(application, dbClient){
         }
 
     });
+
+    //Store Firebase Token
+    app.post('/api/updateFCMToken', async (req, res) => {
+        try{
+            const {userID, fcmToken} = req.body;
+
+            //Check if userID empty
+            if(!userID)
+                return res.status(400).json({error: "User ID not specified."});
+
+            //Disassiocate User with Firebase Token
+            if(!fcmToken)
+                fcmToken = "";
+
+            //Convert ObjectID
+            let userObjectId = new ObjectId(userID);
+
+            //Connect to Databse
+            let db = dbClient.db("PEISS_DB");
+            let user = await db.collection("Users").findOne({_id: userObjectId});
+
+            if(!user)
+                return res.status(404).json({error: "User not found."});
+            
+            //Update 
+            let result = await db.collection('Users').updateOne(
+                {_id: userObjectId},
+                {$set: {fcmToken: fcmToken}}
+            );
+
+            if(result.modifiedCount == 0)
+                return res.status("Firebase Token update unsuccessful!");
+
+            return res.status(200).json({error: "Firebase Token Update Successful!"});
+        }catch(error){
+            return res.status(500).json({error: "An error has occurred."});
+        }
+    }); 
 
 
     //Refresh the Token 
