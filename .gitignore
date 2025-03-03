@@ -1,4 +1,4 @@
 # .gitignore
 .env
-
+firebase-admin.json
 node_modules/

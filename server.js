@@ -1,3 +1,12 @@
+//Firebase Initilization
+const admin = require('firebase-admin');
+const serviceAccount = require('./firebase-admin.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');

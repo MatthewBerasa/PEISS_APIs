@@ -10,6 +10,7 @@ const multerS3 = require('multer-s3');
 const path = require('path');
 const { S3Client } = require('@aws-sdk/client-s3'); // Import the S3Client
 const { json } = require('stream/consumers');
+const admin = require('firebase-admin');
 
 // Configure DigitalOcean Spaces with AWS SDK v3
 const s3Client = new S3Client({
@@ -319,6 +320,26 @@ function setApp(application, dbClient){
     
             // Insert activity log into the database
             await db.collection('ActivityLogs').insertOne(newLog);
+
+            // Send FCM Notification
+            if (fcmToken) {
+                const message = {
+                    token: fcmToken, // User's FCM token
+                    notification: {
+                        title: 'New Activity Log',
+                        body: 'Dectecion Alert!',
+                    },
+                    data: {
+                        imageUrl: imageUrl || '',
+                        timestamp: timestamp.toISOString()
+                    }
+                };
+
+                // Send the notification
+                admin.messaging().send(message)
+                    .then(response => console.log('Notification sent:', response))
+                    .catch(error => console.error('Error sending notification:', error));
+            }
     
             return res.status(200).json({message: 'Activity log added successfully!'});
     
