@@ -339,8 +339,8 @@ function setApp(application, dbClient){
                     const message = {
                         token: fcmToken, // User's FCM token
                         notification: {
-                            title: 'New Activity Log',
-                            body: 'A new activity log has been uploaded!',
+                            title: 'PEISS',
+                            body: 'System Detection Alert!',
                         },
                         data: {
                             imageUrl: imageUrl || '',
